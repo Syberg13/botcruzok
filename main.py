@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import static_ffmpeg
+static_ffmpeg.add_paths()
 import os
 import subprocess
 from aiogram import Bot, Dispatcher, F
@@ -17,33 +19,35 @@ MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024
 
 def compress_and_convert_to_circle(input_path: str, output_path: str) -> bool:
     """
-    Сжимает видео, обрезает до первых 60 секунд и делает из него круглый формат 540x540.
+    Универсальная и устойчивая обработка FFmpeg для Linux и Windows.
     """
     command = [
         "ffmpeg",
         "-y",
-        "-ss", "0",  # Старт с 0 секунды
-        "-t", "60",  # Ограничение по времени 60 сек
+        "-ss", "0",
+        "-t", "60",
         "-i", input_path,
-        # Кадрируем в квадрат по меньше стороне и сжимаем до 540x540
-        "-vf", r"crop=min(iw\,ih):min(iw\,ih),scale=540:540",
+        # 1. Заменяем \, на : (безопаснее для Linux shell)
+        # 2. Add trunc(...,2)*2 чтобы ширина и высота ТОЧНО были кратны 2 (требование H.264)
+        "-vf", "crop=min(iw,ih):min(iw,ih),scale=540:540,format=yuv420p",
         "-c:v", "libx264",
-        "-crf", "30",  # Сжатие качества (30 дает хороший баланс размера и качества)
-        "-preset", "ultrafast",  # Максимально быстрая обработка
-        "-b:v", "750k",  # Ограничение битрейта видео, чтобы файл гарантированно весил мало
-        "-maxrate", "1000k",
-        "-bufsize", "1500k",
-        "-c:a", "aac",  # Перекодирование аудио в легкий формат
-        "-b:a", "64k",
-        "-strict", "experimental",
+        "-crf", "28",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "44100",  # Стандартная частота звука, чтобы избежать ошибок с аудиотреком
         output_path,
     ]
 
     try:
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Логируем точную ошибку, если FFmpeg упадет
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
         return True
+    except subprocess.CalledProcessError as e:
+        logging.error(f"❌ ОШИБКА FFMPEG STDERR:\n{e.stderr}")
+        return False
     except Exception as e:
-        logging.error(f"Ошибка FFmpeg при сжатии: {e}")
+        logging.error(f"❌ Общая ошибка subprocess: {e}")
         return False
 
 
