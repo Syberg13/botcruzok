@@ -19,7 +19,7 @@ MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024
 
 def compress_and_convert_to_circle(input_path: str, output_path: str) -> bool:
     """
-    Универсальная и устойчивая обработка FFmpeg для Linux и Windows.
+    Конвертация в квадратный кружок Telegram без синтаксических ошибок FFmpeg.
     """
     command = [
         "ffmpeg",
@@ -27,27 +27,25 @@ def compress_and_convert_to_circle(input_path: str, output_path: str) -> bool:
         "-ss", "0",
         "-t", "60",
         "-i", input_path,
-        # 1. Заменяем \, на : (безопаснее для Linux shell)
-        # 2. Add trunc(...,2)*2 чтобы ширина и высота ТОЧНО были кратны 2 (требование H.264)
-        "-vf", "crop=min(iw,ih):min(iw,ih),scale=540:540,format=yuv420p",
+        # Задаем обрезку явными переменными w и h, чтобы FFmpeg не путал двоеточия
+        "-vf", "crop='min(iw,ih)':'min(iw,ih)',scale=540:540,format=yuv420p",
         "-c:v", "libx264",
         "-crf", "28",
         "-preset", "ultrafast",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-ar", "44100",  # Стандартная частота звука, чтобы избежать ошибок с аудиотреком
+        "-ar", "44100",
         output_path,
     ]
 
     try:
-        # Логируем точную ошибку, если FFmpeg упадет
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         return True
     except subprocess.CalledProcessError as e:
         logging.error(f"❌ ОШИБКА FFMPEG STDERR:\n{e.stderr}")
         return False
     except Exception as e:
-        logging.error(f"❌ Общая ошибка subprocess: {e}")
+        logging.error(f"❌ Общая ошибка: {e}")
         return False
 
 
